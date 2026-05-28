@@ -1,0 +1,17 @@
+{
+  "name": "GOD’S NOTE～神の恵み～",
+  "short_name": "GOD’S NOTE",
+  "description": "Private mood, work, exercise, and journaling tracker.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f6f2e8",
+  "theme_color": "#f6f2e8",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
