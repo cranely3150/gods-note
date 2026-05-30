@@ -1045,7 +1045,7 @@ function firebaseErrorMessage(error) {
   if (code.includes("permission-denied")) {
     return "Firestoreルールを確認してください";
   }
-  return "Firebaseでエラーが出ました";
+  return code ? `Firebaseエラー: ${code}` : "Firebaseでエラーが出ました";
 }
 
 function getCloudDocRef() {
