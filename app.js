@@ -981,7 +981,8 @@ async function initializeFirebase() {
   try {
     const config = JSON.parse(raw);
     const { appModule, authModule, firestoreModule } = await loadFirebaseModules();
-    cloud.app = appModule.getApps().length ? appModule.getApp() : appModule.initializeApp(config);
+    await Promise.all(appModule.getApps().map((app) => appModule.deleteApp(app)));
+    cloud.app = appModule.initializeApp(config);
     cloud.auth = authModule.getAuth(cloud.app);
     cloud.db = firestoreModule.getFirestore(cloud.app);
     cloud.ready = true;
