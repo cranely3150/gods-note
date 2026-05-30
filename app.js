@@ -1010,15 +1010,9 @@ async function signInToFirebase() {
   const { authModule } = cloud.modules;
   const provider = new authModule.GoogleAuthProvider();
   try {
-    showToast("Googleログインを開きます");
-    await authModule.signInWithPopup(cloud.auth, provider);
+    showToast("Googleログインへ移動します");
+    await authModule.signInWithRedirect(cloud.auth, provider);
   } catch (error) {
-    const code = error?.code || "";
-    if (code.includes("popup-blocked") || code.includes("popup-closed-by-user")) {
-      showToast("ポップアップが開けないためリダイレクトします");
-      await authModule.signInWithRedirect(cloud.auth, provider);
-      return;
-    }
     showToast(firebaseErrorMessage(error));
   }
 }
