@@ -989,6 +989,7 @@ async function initializeFirebase() {
     await Promise.all(appModule.getApps().map((app) => appModule.deleteApp(app)));
     cloud.app = appModule.initializeApp(config);
     cloud.auth = authModule.getAuth(cloud.app);
+    await authModule.setPersistence(cloud.auth, authModule.browserLocalPersistence);
     cloud.db = firestoreModule.getFirestore(cloud.app);
     cloud.ready = true;
     updateFirebaseStatus();
@@ -1033,10 +1034,22 @@ async function signInToFirebase() {
   const provider = new authModule.GoogleAuthProvider();
   try {
     sessionStorage.setItem(FIREBASE_LOGIN_STARTED_KEY, "1");
-    if (els.firebaseDebug) els.firebaseDebug.textContent = "Googleログインへ移動します...";
-    showToast("Googleログインへ移動します");
-    await authModule.signInWithRedirect(cloud.auth, provider);
+    if (els.firebaseDebug) els.firebaseDebug.textContent = "Googleログイン画面を開きます...";
+    showToast("Googleログイン画面を開きます");
+    const result = await authModule.signInWithPopup(cloud.auth, provider);
+    cloud.user = result.user;
+    sessionStorage.removeItem(FIREBASE_LOGIN_STARTED_KEY);
+    updateFirebaseStatus();
+    if (els.firebaseDebug) els.firebaseDebug.textContent = `ログイン済み: ${result.user.email || result.user.uid}`;
+    await loadFromCloudThenSync();
   } catch (error) {
+    const code = error?.code || "";
+    if (code.includes("popup-blocked") || code.includes("popup-closed-by-user")) {
+      if (els.firebaseDebug) els.firebaseDebug.textContent = "ポップアップでログインできないため、Googleログインへ移動します...";
+      showToast("Googleログインへ移動します");
+      await authModule.signInWithRedirect(cloud.auth, provider);
+      return;
+    }
     reportFirebaseError(error);
   }
 }
