@@ -91,6 +91,7 @@ const els = {
   firebaseLoginButton: document.querySelector("#firebaseLoginButton"),
   firebaseSyncNowButton: document.querySelector("#firebaseSyncNowButton"),
   firebaseLogoutButton: document.querySelector("#firebaseLogoutButton"),
+  firebaseDebug: document.querySelector("#firebaseDebug"),
   toast: document.querySelector("#toast"),
 };
 
@@ -995,7 +996,7 @@ async function initializeFirebase() {
   } catch (error) {
     cloud.ready = false;
     updateFirebaseStatus("接続エラー");
-    showToast(firebaseErrorMessage(error));
+    reportFirebaseError(error);
     return false;
   }
 }
@@ -1013,7 +1014,7 @@ async function signInToFirebase() {
     showToast("Googleログインへ移動します");
     await authModule.signInWithRedirect(cloud.auth, provider);
   } catch (error) {
-    showToast(firebaseErrorMessage(error));
+    reportFirebaseError(error);
   }
 }
 
@@ -1023,6 +1024,15 @@ async function signOutFromFirebase() {
   cloud.user = null;
   updateFirebaseStatus();
   showToast("Firebaseからログアウトしました");
+}
+
+function reportFirebaseError(error) {
+  const code = error?.code || "no-code";
+  const message = error?.message || String(error || "no-message");
+  const text = `${firebaseErrorMessage(error)} / ${code} / ${message}`;
+  if (els.firebaseDebug) els.firebaseDebug.textContent = text;
+  showToast(firebaseErrorMessage(error));
+  window.alert(text);
 }
 
 function firebaseErrorMessage(error) {
@@ -1045,7 +1055,7 @@ function firebaseErrorMessage(error) {
   if (code.includes("permission-denied")) {
     return "Firestoreルールを確認してください";
   }
-  return code ? `Firebaseエラー: ${code}` : "Firebaseでエラーが出ました";
+  return code ? `Firebaseエラー: ${code}` : "Firebaseエラー: 詳細なし";
 }
 
 function getCloudDocRef() {
