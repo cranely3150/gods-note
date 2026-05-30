@@ -267,7 +267,10 @@ function bindEvents() {
   els.saveFirebaseConfigButton.addEventListener("click", saveFirebaseConfigFromInput);
   els.firebaseLoginButton.addEventListener("click", signInToFirebase);
   els.firebaseLogoutButton.addEventListener("click", signOutFromFirebase);
-  els.firebaseSyncNowButton.addEventListener("click", () => syncToCloud({ showDone: true }));
+  els.firebaseSyncNowButton.addEventListener("click", () => {
+    showToast("同期を開始します");
+    syncToCloud({ showDone: true, force: true });
+  });
 }
 
 function activateTab(tab) {
@@ -1090,9 +1093,25 @@ async function loadFromCloudThenSync() {
 }
 
 async function syncToCloud(options = {}) {
-  if (!cloud.ready || !cloud.user || !cloud.modules || cloud.syncing) return;
+  if (!cloud.ready) {
+    if (options.showDone) showToast("Firebase設定を保存してください");
+    return;
+  }
+  if (!cloud.user) {
+    if (options.showDone) showToast("Googleログインしてください");
+    return;
+  }
+  if (!cloud.modules) {
+    if (options.showDone) showToast("Firebaseの読み込み中です");
+    return;
+  }
+  if (cloud.syncing) {
+    if (options.showDone) showToast("同期中です");
+    return;
+  }
   cloud.syncing = true;
   updateFirebaseStatus("同期中");
+  if (els.firebaseDebug) els.firebaseDebug.textContent = "Firebaseへ同期中です...";
   try {
     const { firestoreModule } = cloud.modules;
     await firestoreModule.setDoc(getCloudDocRef(), {
@@ -1100,9 +1119,11 @@ async function syncToCloud(options = {}) {
       updatedAt: new Date().toISOString(),
     }, { merge: true });
     updateFirebaseStatus();
+    if (els.firebaseDebug) els.firebaseDebug.textContent = `最終同期: ${new Date().toLocaleString("ja-JP")}`;
     if (options.showDone) showToast("Firebaseに同期しました");
-  } catch {
+  } catch (error) {
     updateFirebaseStatus("同期エラー");
+    reportFirebaseError(error);
   } finally {
     cloud.syncing = false;
   }
