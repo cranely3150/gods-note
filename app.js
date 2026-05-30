@@ -104,6 +104,7 @@ const cloud = {
   modules: null,
   ready: false,
   syncing: false,
+  unsubscribeAuth: null,
 };
 
 const sliderValueMap = {
@@ -986,6 +987,10 @@ async function initializeFirebase() {
   try {
     const config = JSON.parse(raw);
     const { appModule, authModule, firestoreModule } = await loadFirebaseModules();
+    if (cloud.unsubscribeAuth) {
+      cloud.unsubscribeAuth();
+      cloud.unsubscribeAuth = null;
+    }
     await Promise.all(appModule.getApps().map((app) => appModule.deleteApp(app)));
     cloud.app = appModule.initializeApp(config);
     cloud.auth = authModule.getAuth(cloud.app);
@@ -993,17 +998,7 @@ async function initializeFirebase() {
     cloud.db = firestoreModule.getFirestore(cloud.app);
     cloud.ready = true;
     updateFirebaseStatus();
-    authModule.onAuthStateChanged(cloud.auth, async (user) => {
-      cloud.user = user;
-      updateFirebaseStatus();
-      if (user) {
-        sessionStorage.removeItem(FIREBASE_LOGIN_STARTED_KEY);
-        if (els.firebaseDebug) els.firebaseDebug.textContent = `ログイン済み: ${user.email || user.uid}`;
-        await loadFromCloudThenSync();
-      } else if (sessionStorage.getItem(FIREBASE_LOGIN_STARTED_KEY)) {
-        if (els.firebaseDebug) els.firebaseDebug.textContent = "Googleログイン後ですが、未ログインのままです。下のエラーが出ていないか確認してください。";
-      }
-    });
+
     const redirectResult = await authModule.getRedirectResult(cloud.auth).catch((error) => {
       reportFirebaseError(error);
       return null;
@@ -1012,7 +1007,37 @@ async function initializeFirebase() {
       cloud.user = redirectResult.user;
       sessionStorage.removeItem(FIREBASE_LOGIN_STARTED_KEY);
       if (els.firebaseDebug) els.firebaseDebug.textContent = `ログイン復帰: ${redirectResult.user.email || redirectResult.user.uid}`;
+      updateFirebaseStatus();
+      await loadFromCloudThenSync();
+    } else if (cloud.auth.currentUser) {
+      cloud.user = cloud.auth.currentUser;
+      sessionStorage.removeItem(FIREBASE_LOGIN_STARTED_KEY);
+      if (els.firebaseDebug) els.firebaseDebug.textContent = `ログイン済み: ${cloud.user.email || cloud.user.uid}`;
+      updateFirebaseStatus();
     }
+
+    cloud.unsubscribeAuth = authModule.onAuthStateChanged(cloud.auth, async (user) => {
+      cloud.user = user;
+      updateFirebaseStatus();
+      if (user) {
+        sessionStorage.removeItem(FIREBASE_LOGIN_STARTED_KEY);
+        if (els.firebaseDebug) els.firebaseDebug.textContent = `ログイン済み: ${user.email || user.uid}`;
+        await loadFromCloudThenSync();
+      } else if (sessionStorage.getItem(FIREBASE_LOGIN_STARTED_KEY)) {
+        const delayedUser = await waitForFirebaseUser();
+        if (delayedUser) {
+          cloud.user = delayedUser;
+          sessionStorage.removeItem(FIREBASE_LOGIN_STARTED_KEY);
+          updateFirebaseStatus();
+          if (els.firebaseDebug) els.firebaseDebug.textContent = `ログイン済み: ${delayedUser.email || delayedUser.uid}`;
+          await loadFromCloudThenSync();
+          return;
+        }
+        if (els.firebaseDebug) {
+          els.firebaseDebug.textContent = "Googleログイン結果を受け取れませんでした。ブラウザのポップアップ許可後に、もう一度Googleでログインを押してください。";
+        }
+      }
+    });
     updateFirebaseStatus();
     return true;
   } catch (error) {
@@ -1021,6 +1046,21 @@ async function initializeFirebase() {
     reportFirebaseError(error);
     return false;
   }
+}
+
+function waitForFirebaseUser() {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      if (cloud.auth?.currentUser) {
+        window.clearInterval(timer);
+        resolve(cloud.auth.currentUser);
+      } else if (Date.now() - startedAt > 4000) {
+        window.clearInterval(timer);
+        resolve(null);
+      }
+    }, 250);
+  });
 }
 
 async function signInToFirebase() {
