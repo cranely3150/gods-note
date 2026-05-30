@@ -992,9 +992,10 @@ async function initializeFirebase() {
     await authModule.getRedirectResult(cloud.auth).catch(() => null);
     updateFirebaseStatus();
     return true;
-  } catch {
+  } catch (error) {
     cloud.ready = false;
     updateFirebaseStatus("接続エラー");
+    showToast(firebaseErrorMessage(error));
     return false;
   }
 }
@@ -1009,9 +1010,16 @@ async function signInToFirebase() {
   const { authModule } = cloud.modules;
   const provider = new authModule.GoogleAuthProvider();
   try {
+    showToast("Googleログインを開きます");
     await authModule.signInWithPopup(cloud.auth, provider);
-  } catch {
-    await authModule.signInWithRedirect(cloud.auth, provider);
+  } catch (error) {
+    const code = error?.code || "";
+    if (code.includes("popup-blocked") || code.includes("popup-closed-by-user")) {
+      showToast("ポップアップが開けないためリダイレクトします");
+      await authModule.signInWithRedirect(cloud.auth, provider);
+      return;
+    }
+    showToast(firebaseErrorMessage(error));
   }
 }
 
@@ -1021,6 +1029,29 @@ async function signOutFromFirebase() {
   cloud.user = null;
   updateFirebaseStatus();
   showToast("Firebaseからログアウトしました");
+}
+
+function firebaseErrorMessage(error) {
+  const code = error?.code || "";
+  if (code.includes("unauthorized-domain")) {
+    return "Firebaseの承認済みドメインにcranely3150.github.ioを追加してください";
+  }
+  if (code.includes("invalid-api-key")) {
+    return "Firebase configのapiKeyを確認してください";
+  }
+  if (code.includes("operation-not-allowed")) {
+    return "Firebase AuthenticationでGoogleログインを有効にしてください";
+  }
+  if (code.includes("popup-blocked")) {
+    return "ポップアップがブロックされました";
+  }
+  if (code.includes("popup-closed-by-user")) {
+    return "ログイン画面が閉じられました";
+  }
+  if (code.includes("permission-denied")) {
+    return "Firestoreルールを確認してください";
+  }
+  return "Firebaseでエラーが出ました";
 }
 
 function getCloudDocRef() {
