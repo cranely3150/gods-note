@@ -272,6 +272,26 @@
           <section class="surface">
             <div class="section-head">
               <div>
+                <p class="eyebrow">CLOUD SYNC</p>
+                <h2>Firebase同期</h2>
+              </div>
+              <span class="pill" id="firebaseStatus">未接続</span>
+            </div>
+            <label class="field">Firebase config
+              <textarea id="firebaseConfigInput" rows="7" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","appId":"..."}'></textarea>
+            </label>
+            <div class="button-row">
+              <button class="secondary-button" id="saveFirebaseConfigButton" type="button">設定保存</button>
+              <button class="primary-button" id="firebaseLoginButton" type="button">Googleでログイン</button>
+              <button class="secondary-button" id="firebaseSyncNowButton" type="button">今すぐ同期</button>
+              <button class="secondary-button" id="firebaseLogoutButton" type="button">ログアウト</button>
+            </div>
+            <p class="note">Firebaseにログインすると、記録全体を自分のGoogleアカウント配下に保存します。スマホの履歴を消しても、同じGoogleアカウントでログインすれば復元できます。</p>
+          </section>
+
+          <section class="surface">
+            <div class="section-head">
+              <div>
                 <p class="eyebrow">EXERCISE TYPES</p>
                 <h2>運動アクティビティ候補</h2>
               </div>

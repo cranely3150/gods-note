@@ -1,4 +1,6 @@
 const STORAGE_KEY = "life-rhythm-journal-v1";
+const FIREBASE_CONFIG_KEY = "gods-note-firebase-config-v1";
+const FIREBASE_SDK_VERSION = "10.12.5";
 
 const DEFAULT_ACTIVITIES = [
   { id: "stretch", label: "ストレッチ" },
@@ -83,7 +85,23 @@ const els = {
   exportButton: document.querySelector("#exportButton"),
   importButton: document.querySelector("#importButton"),
   importFile: document.querySelector("#importFile"),
+  firebaseStatus: document.querySelector("#firebaseStatus"),
+  firebaseConfigInput: document.querySelector("#firebaseConfigInput"),
+  saveFirebaseConfigButton: document.querySelector("#saveFirebaseConfigButton"),
+  firebaseLoginButton: document.querySelector("#firebaseLoginButton"),
+  firebaseSyncNowButton: document.querySelector("#firebaseSyncNowButton"),
+  firebaseLogoutButton: document.querySelector("#firebaseLogoutButton"),
   toast: document.querySelector("#toast"),
+};
+
+const cloud = {
+  app: null,
+  auth: null,
+  db: null,
+  user: null,
+  modules: null,
+  ready: false,
+  syncing: false,
 };
 
 const sliderValueMap = {
@@ -100,6 +118,7 @@ function init() {
   migrateExistingDays();
   bindEvents();
   renderAll();
+  initializeFirebase();
   registerServiceWorker();
 }
 
@@ -244,6 +263,10 @@ function bindEvents() {
   els.exportButton.addEventListener("click", exportData);
   els.importButton.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", importData);
+  els.saveFirebaseConfigButton.addEventListener("click", saveFirebaseConfigFromInput);
+  els.firebaseLoginButton.addEventListener("click", signInToFirebase);
+  els.firebaseLogoutButton.addEventListener("click", signOutFromFirebase);
+  els.firebaseSyncNowButton.addEventListener("click", () => syncToCloud({ showDone: true }));
 }
 
 function activateTab(tab) {
@@ -473,6 +496,8 @@ function refreshSupplementNameOptions() {
 
 function renderSettings() {
   els.settingsForm.elements.weightKg.value = state.settings.weightKg ?? "";
+  els.firebaseConfigInput.value = getFirebaseConfigText();
+  updateFirebaseStatus();
   renderActivityRows();
   renderSupplementCandidateRows();
 }
@@ -866,6 +891,7 @@ function loadState() {
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  syncToCloud();
 }
 
 function exportData() {
@@ -905,6 +931,164 @@ function importData() {
     }
   });
   reader.readAsText(file);
+}
+
+function getFirebaseConfigText() {
+  return localStorage.getItem(FIREBASE_CONFIG_KEY) || "";
+}
+
+function saveFirebaseConfigFromInput() {
+  const raw = els.firebaseConfigInput.value.trim();
+  if (!raw) {
+    localStorage.removeItem(FIREBASE_CONFIG_KEY);
+    showToast("Firebase設定を削除しました");
+    updateFirebaseStatus();
+    return;
+  }
+
+  try {
+    const config = JSON.parse(raw);
+    if (!config.apiKey || !config.authDomain || !config.projectId || !config.appId) {
+      throw new Error("Missing required fields");
+    }
+    localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(config, null, 2));
+    showToast("Firebase設定を保存しました");
+    initializeFirebase();
+  } catch {
+    showToast("Firebase configのJSONを確認してください");
+  }
+}
+
+async function loadFirebaseModules() {
+  if (cloud.modules) return cloud.modules;
+  const [appModule, authModule, firestoreModule] = await Promise.all([
+    import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-app.js`),
+    import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-auth.js`),
+    import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-firestore.js`),
+  ]);
+  cloud.modules = { appModule, authModule, firestoreModule };
+  return cloud.modules;
+}
+
+async function initializeFirebase() {
+  const raw = getFirebaseConfigText();
+  if (!raw) {
+    updateFirebaseStatus("未設定");
+    return false;
+  }
+
+  try {
+    const config = JSON.parse(raw);
+    const { appModule, authModule, firestoreModule } = await loadFirebaseModules();
+    cloud.app = appModule.getApps().length ? appModule.getApp() : appModule.initializeApp(config);
+    cloud.auth = authModule.getAuth(cloud.app);
+    cloud.db = firestoreModule.getFirestore(cloud.app);
+    cloud.ready = true;
+    authModule.onAuthStateChanged(cloud.auth, async (user) => {
+      cloud.user = user;
+      updateFirebaseStatus();
+      if (user) await loadFromCloudThenSync();
+    });
+    await authModule.getRedirectResult(cloud.auth).catch(() => null);
+    updateFirebaseStatus();
+    return true;
+  } catch {
+    cloud.ready = false;
+    updateFirebaseStatus("接続エラー");
+    return false;
+  }
+}
+
+async function signInToFirebase() {
+  const ready = cloud.ready || await initializeFirebase();
+  if (!ready) {
+    showToast("Firebase設定を先に保存してください");
+    return;
+  }
+
+  const { authModule } = cloud.modules;
+  const provider = new authModule.GoogleAuthProvider();
+  try {
+    await authModule.signInWithPopup(cloud.auth, provider);
+  } catch {
+    await authModule.signInWithRedirect(cloud.auth, provider);
+  }
+}
+
+async function signOutFromFirebase() {
+  if (!cloud.auth || !cloud.modules) return;
+  await cloud.modules.authModule.signOut(cloud.auth);
+  cloud.user = null;
+  updateFirebaseStatus();
+  showToast("Firebaseからログアウトしました");
+}
+
+function getCloudDocRef() {
+  const { firestoreModule } = cloud.modules;
+  return firestoreModule.doc(cloud.db, "users", cloud.user.uid, "backups", "state");
+}
+
+async function loadFromCloudThenSync() {
+  if (!cloud.user || !cloud.modules) return;
+  try {
+    const { firestoreModule } = cloud.modules;
+    const snapshot = await firestoreModule.getDoc(getCloudDocRef());
+    if (snapshot.exists()) {
+      const remote = snapshot.data();
+      if (remote?.state?.days && remote?.state?.settings) {
+        const localUpdated = latestLocalUpdatedAt();
+        const remoteUpdated = remote.updatedAt || "";
+        if (remoteUpdated > localUpdated) {
+          state.settings = remote.state.settings;
+          state.days = remote.state.days;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          renderAll();
+          showToast("Firebaseから復元しました");
+        }
+      }
+    }
+    await syncToCloud({ showDone: true });
+  } catch {
+    showToast("Firebaseから読み込めませんでした");
+  }
+}
+
+async function syncToCloud(options = {}) {
+  if (!cloud.ready || !cloud.user || !cloud.modules || cloud.syncing) return;
+  cloud.syncing = true;
+  updateFirebaseStatus("同期中");
+  try {
+    const { firestoreModule } = cloud.modules;
+    await firestoreModule.setDoc(getCloudDocRef(), {
+      state,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    updateFirebaseStatus();
+    if (options.showDone) showToast("Firebaseに同期しました");
+  } catch {
+    updateFirebaseStatus("同期エラー");
+  } finally {
+    cloud.syncing = false;
+  }
+}
+
+function latestLocalUpdatedAt() {
+  return Object.values(state.days || {}).reduce((latest, day) => {
+    const value = day?.updatedAt || "";
+    return value > latest ? value : latest;
+  }, "");
+}
+
+function updateFirebaseStatus(override) {
+  if (!els.firebaseStatus) return;
+  if (override) {
+    els.firebaseStatus.textContent = override;
+    return;
+  }
+  if (!getFirebaseConfigText()) els.firebaseStatus.textContent = "未設定";
+  else if (!cloud.ready) els.firebaseStatus.textContent = "未接続";
+  else if (!cloud.user) els.firebaseStatus.textContent = "未ログイン";
+  else els.firebaseStatus.textContent = cloud.syncing ? "同期中" : "同期済み";
 }
 
 function registerServiceWorker() {

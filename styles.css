@@ -400,6 +400,13 @@ input[type="range"] {
   align-items: center;
 }
 
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .primary-button {
   min-height: 40px;
   padding: 0 16px;

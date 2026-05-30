@@ -46,6 +46,7 @@ http://PCのIPアドレス:4173
 - JSONエクスポート
 
 データはブラウザのlocalStorageに保存されます。
+Firebase同期を設定すると、同じGoogleアカウントで復元できるクラウド保存も使えます。設定手順は `FIREBASE_SETUP.md` を見てください。
 
 ## 変更が反映されないとき
 
