@@ -52,6 +52,8 @@ const els = {
   calendarGrid: document.querySelector("#calendarGrid"),
   dailyForm: document.querySelector("#dailyForm"),
   settingsForm: document.querySelector("#settingsForm"),
+  checkinNowButton: document.querySelector("#checkinNowButton"),
+  checkoutNowButton: document.querySelector("#checkoutNowButton"),
   morningStatus: document.querySelector("#morningStatus"),
   checkoutStatus: document.querySelector("#checkoutStatus"),
   caloriePreview: document.querySelector("#caloriePreview"),
@@ -79,6 +81,8 @@ const els = {
   moodChart: document.querySelector("#moodChart"),
   insightsList: document.querySelector("#insightsList"),
   exportButton: document.querySelector("#exportButton"),
+  importButton: document.querySelector("#importButton"),
+  importFile: document.querySelector("#importFile"),
   toast: document.querySelector("#toast"),
 };
 
@@ -124,6 +128,17 @@ function bindEvents() {
   els.prevMonth.addEventListener("click", () => moveMonth(-1));
   els.nextMonth.addEventListener("click", () => moveMonth(1));
 
+  els.checkinNowButton.addEventListener("click", () => {
+    setMorningTimeNow();
+    saveCurrentSection("朝チェックイン");
+  });
+
+  els.checkoutNowButton.addEventListener("click", () => {
+    setCheckoutTimeNow();
+    els.dailyForm.dataset.checkoutTouchedDate = selectedDate;
+    saveCurrentSection("夜チェックアウト");
+  });
+
   els.addExerciseButton.addEventListener("click", () => {
     addExerciseRow(blankExercise());
     saveDailyFromForm();
@@ -149,9 +164,7 @@ function bindEvents() {
   });
 
   els.dailyForm.addEventListener("input", (event) => {
-    if (event.target.matches("[data-morning-field]")) ensureMorningTime();
     if (event.target.matches("[data-checkout-field]")) {
-      ensureCheckoutTime();
       els.dailyForm.dataset.checkoutTouchedDate = selectedDate;
     }
     saveDailyFromForm();
@@ -229,6 +242,8 @@ function bindEvents() {
 
   els.addJournalButton.addEventListener("click", addJournal);
   els.exportButton.addEventListener("click", exportData);
+  els.importButton.addEventListener("click", () => els.importFile.click());
+  els.importFile.addEventListener("change", importData);
 }
 
 function activateTab(tab) {
@@ -355,20 +370,18 @@ function saveDailyFromForm() {
   saveState();
 }
 
-function ensureMorningTime() {
+function setMorningTimeNow() {
   const field = els.dailyForm.elements.morningCheckedAt;
-  if (!field.value) field.value = currentTimeValue();
+  field.value = currentTimeValue();
 }
 
-function ensureCheckoutTime() {
+function setCheckoutTimeNow() {
   const field = els.dailyForm.elements.checkoutCheckedAt;
-  if (!field.value) field.value = currentTimeValue();
+  field.value = currentTimeValue();
 }
 
 function saveCurrentSection(sectionName) {
-  if (sectionName === "朝チェックイン") ensureMorningTime();
   if (sectionName === "夜チェックアウト") {
-    ensureCheckoutTime();
     els.dailyForm.dataset.checkoutTouchedDate = selectedDate;
   }
   saveDailyFromForm();
@@ -804,7 +817,7 @@ function blankSupplement() {
 }
 
 function defaultSupplements() {
-  return getSupplementCandidates().map((name) => ({ taken: false, name, timing: "morning", note: "" }));
+  return [{ taken: false, name: "すべて", timing: "morning", note: "" }];
 }
 
 function supplementStatusText(daily) {
@@ -864,6 +877,34 @@ function exportData() {
   link.click();
   URL.revokeObjectURL(url);
   showToast("JSONを書き出しました");
+}
+
+function importData() {
+  const file = els.importFile.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    try {
+      const parsed = JSON.parse(String(reader.result));
+      if (!parsed || typeof parsed !== "object" || !parsed.days || !parsed.settings) {
+        throw new Error("Invalid backup");
+      }
+      state.settings = {
+        weightKg: parsed.settings.weightKg ?? null,
+        activities: parsed.settings.activities || DEFAULT_ACTIVITIES,
+        supplements: mergeDefaultSupplements(parsed.settings.supplements || DEFAULT_SUPPLEMENTS),
+      };
+      state.days = parsed.days || {};
+      saveState();
+      renderAll();
+      showToast("バックアップを復元しました");
+    } catch {
+      showToast("復元できないJSONです");
+    } finally {
+      els.importFile.value = "";
+    }
+  });
+  reader.readAsText(file);
 }
 
 function registerServiceWorker() {

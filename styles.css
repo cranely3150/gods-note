@@ -393,6 +393,13 @@ input[type="range"] {
   accent-color: var(--accent);
 }
 
+.time-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
 .primary-button {
   min-height: 40px;
   padding: 0 16px;

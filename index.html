@@ -75,7 +75,10 @@
                 </div>
               </div>
               <label class="field">チェックイン時間
-                <input name="morningCheckedAt" type="time" readonly>
+                <div class="time-row">
+                  <input name="morningCheckedAt" type="time">
+                  <button class="secondary-button" id="checkinNowButton" type="button">チェックイン</button>
+                </div>
               </label>
               <div class="slider-grid">
                 <label>気分 <strong id="morningMoodValue">5</strong>
@@ -168,7 +171,10 @@
                 </div>
               </div>
               <label class="field">チェックアウト時間
-                <input name="checkoutCheckedAt" type="time" readonly>
+                <div class="time-row">
+                  <input name="checkoutCheckedAt" type="time">
+                  <button class="secondary-button" id="checkoutNowButton" type="button">チェックアウト</button>
+                </div>
               </label>
               <label class="field">今日感謝したこと
                 <textarea name="gratitude" rows="4" data-checkout-field="true" placeholder="小さくてもいいので、今日ありがたかったこと"></textarea>
@@ -249,6 +255,18 @@
               </label>
               <p class="note">消費カロリーは METs x 体重 x 時間 x 1.05 の簡易推定です。</p>
             </form>
+          </section>
+
+          <section class="surface">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">BACKUP</p>
+                <h2>バックアップと復元</h2>
+              </div>
+              <button class="secondary-button" id="importButton" type="button">復元</button>
+            </div>
+            <input id="importFile" type="file" accept="application/json" hidden>
+            <p class="note">ブラウザ履歴やサイトデータを削除すると端末内の記録は消える可能性があります。JSONを書き出しておけば、この復元ボタンから戻せます。</p>
           </section>
 
           <section class="surface">
