@@ -1,5 +1,6 @@
 const STORAGE_KEY = "life-rhythm-journal-v1";
 const FIREBASE_CONFIG_KEY = "gods-note-firebase-config-v1";
+const FIREBASE_LOGIN_STARTED_KEY = "gods-note-firebase-login-started-v1";
 const FIREBASE_SDK_VERSION = "10.12.5";
 
 const DEFAULT_ACTIVITIES = [
@@ -268,6 +269,7 @@ function bindEvents() {
   els.firebaseLoginButton.addEventListener("click", signInToFirebase);
   els.firebaseLogoutButton.addEventListener("click", signOutFromFirebase);
   els.firebaseSyncNowButton.addEventListener("click", () => {
+    if (els.firebaseDebug) els.firebaseDebug.textContent = "同期ボタンを押しました。ログイン状態を確認しています...";
     showToast("同期を開始します");
     syncToCloud({ showDone: true, force: true });
   });
@@ -989,12 +991,27 @@ async function initializeFirebase() {
     cloud.auth = authModule.getAuth(cloud.app);
     cloud.db = firestoreModule.getFirestore(cloud.app);
     cloud.ready = true;
+    updateFirebaseStatus();
     authModule.onAuthStateChanged(cloud.auth, async (user) => {
       cloud.user = user;
       updateFirebaseStatus();
-      if (user) await loadFromCloudThenSync();
+      if (user) {
+        sessionStorage.removeItem(FIREBASE_LOGIN_STARTED_KEY);
+        if (els.firebaseDebug) els.firebaseDebug.textContent = `ログイン済み: ${user.email || user.uid}`;
+        await loadFromCloudThenSync();
+      } else if (sessionStorage.getItem(FIREBASE_LOGIN_STARTED_KEY)) {
+        if (els.firebaseDebug) els.firebaseDebug.textContent = "Googleログイン後ですが、未ログインのままです。下のエラーが出ていないか確認してください。";
+      }
     });
-    await authModule.getRedirectResult(cloud.auth).catch(() => null);
+    const redirectResult = await authModule.getRedirectResult(cloud.auth).catch((error) => {
+      reportFirebaseError(error);
+      return null;
+    });
+    if (redirectResult?.user) {
+      cloud.user = redirectResult.user;
+      sessionStorage.removeItem(FIREBASE_LOGIN_STARTED_KEY);
+      if (els.firebaseDebug) els.firebaseDebug.textContent = `ログイン復帰: ${redirectResult.user.email || redirectResult.user.uid}`;
+    }
     updateFirebaseStatus();
     return true;
   } catch (error) {
@@ -1015,6 +1032,8 @@ async function signInToFirebase() {
   const { authModule } = cloud.modules;
   const provider = new authModule.GoogleAuthProvider();
   try {
+    sessionStorage.setItem(FIREBASE_LOGIN_STARTED_KEY, "1");
+    if (els.firebaseDebug) els.firebaseDebug.textContent = "Googleログインへ移動します...";
     showToast("Googleログインへ移動します");
     await authModule.signInWithRedirect(cloud.auth, provider);
   } catch (error) {
