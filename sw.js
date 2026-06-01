@@ -1,4 +1,4 @@
-const CACHE_NAME = "gods-note-v28";
+const CACHE_NAME = "gods-note-v29";
 const ASSETS = [
   "./",
   "./index.html",

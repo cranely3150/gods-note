@@ -42,34 +42,19 @@ service cloud.firestore {
 }
 ```
 
-## 5. Add a Web app and copy config
+## 5. Add a Web app
 
 1. Open Project settings
 2. Add app
 3. Choose Web
-4. Copy only the `firebaseConfig` object
+4. Confirm that the config in `app.js` matches this Firebase project
 
-It should look like this:
-
-```json
-{
-  "apiKey": "...",
-  "authDomain": "...",
-  "projectId": "...",
-  "storageBucket": "...",
-  "messagingSenderId": "...",
-  "appId": "..."
-}
-```
-
-## 6. Paste config in GOD'S NOTE
+## 6. Use GOD'S NOTE
 
 1. Open GOD'S NOTE
 2. Open Settings
-3. Paste the config into Firebase config
-4. Press Save config
-5. Press Google login
-6. Press Sync now once
+3. Press Google login
+4. Press Sync now once
 
 After this, records are saved to:
 

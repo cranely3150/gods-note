@@ -1,7 +1,15 @@
 const STORAGE_KEY = "life-rhythm-journal-v1";
-const FIREBASE_CONFIG_KEY = "gods-note-firebase-config-v1";
 const FIREBASE_LOGIN_STARTED_KEY = "gods-note-firebase-login-started-v1";
 const FIREBASE_SDK_VERSION = "10.12.5";
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB-fu7s2Vt-hGRvPrX-R1ETiBQW4LUlt1o",
+  authDomain: "gods-note.firebaseapp.com",
+  projectId: "gods-note",
+  storageBucket: "gods-note.firebasestorage.app",
+  messagingSenderId: "117683494190",
+  appId: "1:117683494190:web:1207b136958d6c9ebdeebf",
+  measurementId: "G-Z36Z63EH1Q",
+};
 
 const MOTIVATION_QUOTES = [
   { text: "継続は力なり。小さく続ける者が遠くへ行く。", author: "日本のことわざ" },
@@ -108,8 +116,6 @@ const els = {
   importButton: document.querySelector("#importButton"),
   importFile: document.querySelector("#importFile"),
   firebaseStatus: document.querySelector("#firebaseStatus"),
-  firebaseConfigInput: document.querySelector("#firebaseConfigInput"),
-  saveFirebaseConfigButton: document.querySelector("#saveFirebaseConfigButton"),
   firebaseLoginButton: document.querySelector("#firebaseLoginButton"),
   firebaseSyncNowButton: document.querySelector("#firebaseSyncNowButton"),
   firebaseLogoutButton: document.querySelector("#firebaseLogoutButton"),
@@ -305,7 +311,6 @@ function bindEvents() {
   els.importButton.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", importData);
   els.moodChart.addEventListener("pointerdown", handleChartTap);
-  els.saveFirebaseConfigButton.addEventListener("click", saveFirebaseConfigFromInput);
   els.firebaseLoginButton.addEventListener("click", signInToFirebase);
   els.firebaseLogoutButton.addEventListener("click", signOutFromFirebase);
   els.firebaseSyncNowButton.addEventListener("click", () => {
@@ -571,7 +576,6 @@ function refreshSupplementNameOptions() {
 
 function renderSettings() {
   els.settingsForm.elements.weightKg.value = state.settings.weightKg ?? "";
-  els.firebaseConfigInput.value = getFirebaseConfigText();
   updateFirebaseStatus();
   renderActivityRows();
   renderSupplementCandidateRows();
@@ -1155,32 +1159,6 @@ function importData() {
   reader.readAsText(file);
 }
 
-function getFirebaseConfigText() {
-  return localStorage.getItem(FIREBASE_CONFIG_KEY) || "";
-}
-
-function saveFirebaseConfigFromInput() {
-  const raw = els.firebaseConfigInput.value.trim();
-  if (!raw) {
-    localStorage.removeItem(FIREBASE_CONFIG_KEY);
-    showToast("Firebase設定を削除しました");
-    updateFirebaseStatus();
-    return;
-  }
-
-  try {
-    const config = JSON.parse(raw);
-    if (!config.apiKey || !config.authDomain || !config.projectId || !config.appId) {
-      throw new Error("Missing required fields");
-    }
-    localStorage.setItem(FIREBASE_CONFIG_KEY, JSON.stringify(config, null, 2));
-    showToast("Firebase設定を保存しました");
-    initializeFirebase();
-  } catch {
-    showToast("Firebase configのJSONを確認してください");
-  }
-}
-
 async function loadFirebaseModules() {
   if (cloud.modules) return cloud.modules;
   const [appModule, authModule, firestoreModule] = await Promise.all([
@@ -1193,14 +1171,8 @@ async function loadFirebaseModules() {
 }
 
 async function initializeFirebase() {
-  const raw = getFirebaseConfigText();
-  if (!raw) {
-    updateFirebaseStatus("未設定");
-    return false;
-  }
-
   try {
-    const config = JSON.parse(raw);
+    const config = FIREBASE_CONFIG;
     const { appModule, authModule, firestoreModule } = await loadFirebaseModules();
     if (cloud.unsubscribeAuth) {
       cloud.unsubscribeAuth();
@@ -1332,7 +1304,7 @@ function firebaseErrorMessage(error) {
     return "Firebaseの承認済みドメインにcranely3150.github.ioを追加してください";
   }
   if (code.includes("invalid-api-key")) {
-    return "Firebase configのapiKeyを確認してください";
+    return "Firebase設定のapiKeyを確認してください";
   }
   if (code.includes("operation-not-allowed")) {
     return "Firebase AuthenticationでGoogleログインを有効にしてください";
@@ -1429,8 +1401,7 @@ function updateFirebaseStatus(override) {
     els.firebaseStatus.textContent = override;
     return;
   }
-  if (!getFirebaseConfigText()) els.firebaseStatus.textContent = "未設定";
-  else if (!cloud.ready) els.firebaseStatus.textContent = "未接続";
+  if (!cloud.ready) els.firebaseStatus.textContent = "未接続";
   else if (!cloud.user) els.firebaseStatus.textContent = "未ログイン";
   else els.firebaseStatus.textContent = cloud.syncing ? "同期中" : "同期済み";
 }
