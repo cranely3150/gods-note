@@ -633,6 +633,18 @@ input[type="range"] {
   border-radius: 50%;
 }
 
+.chart-tooltip {
+  margin-top: 8px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf8;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
 .journal-item {
   position: relative;
   padding: 14px;

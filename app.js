@@ -101,6 +101,7 @@ const els = {
   statsGrid: document.querySelector("#statsGrid"),
   chartLegend: document.querySelector("#chartLegend"),
   moodChart: document.querySelector("#moodChart"),
+  chartTooltip: document.querySelector("#chartTooltip"),
   insightsList: document.querySelector("#insightsList"),
   exportButton: document.querySelector("#exportButton"),
   importButton: document.querySelector("#importButton"),
@@ -125,6 +126,8 @@ const cloud = {
   syncing: false,
   unsubscribeAuth: null,
 };
+
+let chartPoints = [];
 
 const sliderValueMap = {
   morningMood: document.querySelector("#morningMoodValue"),
@@ -291,6 +294,7 @@ function bindEvents() {
   els.exportButton.addEventListener("click", exportData);
   els.importButton.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", importData);
+  els.moodChart.addEventListener("pointerdown", handleChartTap);
   els.saveFirebaseConfigButton.addEventListener("click", saveFirebaseConfigFromInput);
   els.firebaseLoginButton.addEventListener("click", signInToFirebase);
   els.firebaseLogoutButton.addEventListener("click", signOutFromFirebase);
@@ -790,7 +794,7 @@ function renderReport() {
 }
 
 function renderLegend() {
-  const items = [["気分", "#0f766e"], ["眠気", "#b45309"], ["やる気", "#be123c"]];
+  const items = [["気分", "#0f766e"], ["やる気", "#be123c"], ["睡眠", "#2563eb"]];
   els.chartLegend.innerHTML = items.map(([label, color]) => `<span><i style="background:${color}"></i>${label}</span>`).join("");
 }
 
@@ -799,6 +803,7 @@ function drawMorningChart(rows) {
   const context = canvas.getContext("2d");
   const width = canvas.width;
   const height = canvas.height;
+  chartPoints = [];
   context.clearRect(0, 0, width, height);
   context.fillStyle = "#fffdf8";
   context.fillRect(0, 0, width, height);
@@ -811,8 +816,8 @@ function drawMorningChart(rows) {
   context.lineWidth = 1;
   context.fillStyle = "#697276";
   context.font = "12px system-ui";
-  for (let score = 1; score <= 10; score += 3) {
-    const y = padding.top + chartHeight - ((score - 1) / 9) * chartHeight;
+  for (let score = 0; score <= 10; score += 5) {
+    const y = padding.top + chartHeight - (score / 10) * chartHeight;
     context.beginPath();
     context.moveTo(padding.left, y);
     context.lineTo(width - padding.right, y);
@@ -821,23 +826,26 @@ function drawMorningChart(rows) {
   }
 
   const series = [
-    { key: "morningMood", color: "#0f766e" },
-    { key: "sleepiness", color: "#b45309" },
-    { key: "motivation", color: "#be123c" },
+    { key: "morningMood", label: "気分", color: "#0f766e", unit: "" },
+    { key: "motivation", label: "やる気", color: "#be123c", unit: "" },
+    { key: "sleepHours", label: "睡眠", color: "#2563eb", unit: "h" },
   ];
   const hasAnyPoint = series.some((item) => rows.some((row) => isNumber(row.daily[item.key])));
   if (!hasAnyPoint) {
     context.fillStyle = "#697276";
     context.font = "16px system-ui";
     context.fillText("この期間の朝データはまだありません", padding.left, height / 2);
+    if (els.chartTooltip) els.chartTooltip.textContent = "点をタップすると詳細が出ます。";
     return;
   }
 
   const xFor = (index) => padding.left + (rows.length === 1 ? chartWidth / 2 : (index / (rows.length - 1)) * chartWidth);
-  const yFor = (value) => padding.top + chartHeight - ((value - 1) / 9) * chartHeight;
+  const yFor = (value) => padding.top + chartHeight - (Math.max(0, Math.min(10, value)) / 10) * chartHeight;
 
   series.forEach((item) => {
-    const points = rows.map((row, index) => ({ index, value: row.daily[item.key] })).filter((point) => isNumber(point.value));
+    const points = rows
+      .map((row, index) => ({ index, row, value: row.daily[item.key] }))
+      .filter((point) => isNumber(point.value));
     if (!points.length) return;
     context.strokeStyle = item.color;
     context.lineWidth = 3;
@@ -852,13 +860,16 @@ function drawMorningChart(rows) {
     });
     context.stroke();
     points.forEach((point) => {
+      const x = xFor(point.index);
+      const y = yFor(point.value);
       context.fillStyle = "#fffdf8";
       context.beginPath();
-      context.arc(xFor(point.index), yFor(point.value), 5, 0, Math.PI * 2);
+      context.arc(x, y, 6, 0, Math.PI * 2);
       context.fill();
       context.strokeStyle = item.color;
       context.lineWidth = 2;
       context.stroke();
+      chartPoints.push({ x, y, radius: 18, series: item, row: point.row, value: point.value });
     });
   });
 
@@ -869,6 +880,29 @@ function drawMorningChart(rows) {
     const date = parseDateKey(row.date);
     context.fillText(`${date.getMonth() + 1}/${date.getDate()}`, xFor(index) - 12, height - 14);
   });
+}
+
+function handleChartTap(event) {
+  if (!chartPoints.length) return;
+  const rect = els.moodChart.getBoundingClientRect();
+  const scaleX = els.moodChart.width / rect.width;
+  const scaleY = els.moodChart.height / rect.height;
+  const x = (event.clientX - rect.left) * scaleX;
+  const y = (event.clientY - rect.top) * scaleY;
+  const nearest = chartPoints
+    .map((point) => ({ point, distance: Math.hypot(point.x - x, point.y - y) }))
+    .filter((item) => item.distance <= item.point.radius)
+    .sort((a, b) => a.distance - b.distance)[0]?.point;
+  if (!nearest) {
+    els.chartTooltip.textContent = "点の近くをタップすると詳細が出ます。";
+    return;
+  }
+
+  const date = parseDateKey(nearest.row.date);
+  const dateText = `${date.getMonth() + 1}/${date.getDate()}`;
+  const checkin = nearest.row.daily.morningCheckedAt ? ` 朝 ${nearest.row.daily.morningCheckedAt}` : "";
+  const value = nearest.series.unit === "h" ? `${nearest.value.toFixed(1)}h` : `${nearest.value}`;
+  els.chartTooltip.textContent = `${dateText}${checkin} / ${nearest.series.label}: ${value}`;
 }
 
 function renderInsights(rows) {
