@@ -32,6 +32,96 @@ body {
   line-height: 1.5;
 }
 
+.launch-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 247, 194, 0.98), rgba(245, 158, 11, 0.92) 36%, rgba(17, 24, 39, 0.98) 72%),
+    #111827;
+  color: #111827;
+  overflow: hidden;
+  transition: opacity 360ms ease, transform 360ms ease;
+}
+
+.launch-splash::before,
+.launch-splash::after {
+  content: "";
+  position: absolute;
+  width: 140vmax;
+  height: 140vmax;
+  background: conic-gradient(from 0deg, rgba(255,255,255,0), rgba(255,255,255,0.75), rgba(255,255,255,0), rgba(180,83,9,0.88), rgba(255,255,255,0));
+  animation: jackpot-spin 900ms linear infinite;
+}
+
+.launch-splash::after {
+  width: 88vmax;
+  height: 88vmax;
+  animation-duration: 560ms;
+  animation-direction: reverse;
+  opacity: 0.65;
+}
+
+.launch-splash.hide {
+  opacity: 0;
+  transform: scale(1.08);
+  pointer-events: none;
+}
+
+.launch-burst {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-width: min(88vw, 560px);
+  padding: 28px 18px 32px;
+  border: 7px solid #fff7c2;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #fef3c7, #f59e0b 48%, #7c2d12);
+  box-shadow: 0 0 0 7px #111827, 0 0 42px rgba(255, 247, 194, 0.9), inset 0 0 28px rgba(255, 255, 255, 0.55);
+  animation: jackpot-pop 880ms cubic-bezier(.2, 1.2, .18, 1) both;
+}
+
+.launch-burst span {
+  font-family: "Georgia", "Times New Roman", serif;
+  font-size: clamp(6rem, 29vw, 13rem);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.78;
+  text-shadow: 0 3px 0 #fff7c2, 0 12px 24px rgba(17, 24, 39, 0.34);
+}
+
+.launch-burst strong {
+  margin-top: 8px;
+  padding: 2px 16px;
+  border: 3px solid #111827;
+  background: #be123c;
+  color: #fff7c2;
+  font-size: clamp(1.4rem, 8vw, 3rem);
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.launch-burst small {
+  margin-top: 10px;
+  color: #111827;
+  font-size: 0.86rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+@keyframes jackpot-spin {
+  to { transform: rotate(1turn); }
+}
+
+@keyframes jackpot-pop {
+  0% { transform: scale(0.62) rotate(-2deg); filter: brightness(1.7); }
+  62% { transform: scale(1.08) rotate(1deg); }
+  100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+}
+
 button,
 input,
 textarea,
@@ -589,6 +679,22 @@ input[type="range"] {
   color: var(--ink);
   font-size: 0.9rem;
   font-weight: 850;
+}
+
+.check-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.compact-check {
+  min-height: 42px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf8;
 }
 
 .checkline input {

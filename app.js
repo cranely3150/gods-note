@@ -59,6 +59,7 @@ let editingJournal = null;
 const els = {
   selectedDateText: document.querySelector("#selectedDateText"),
   selectedDateLabel: document.querySelector("#selectedDateLabel"),
+  launchSplash: document.querySelector("#launchSplash"),
   datePicker: document.querySelector("#datePicker"),
   dateButton: document.querySelector("#dateButton"),
   prevDay: document.querySelector("#prevDay"),
@@ -139,12 +140,21 @@ const sliderValueMap = {
 init();
 
 function init() {
+  dismissLaunchSplash();
   els.datePicker.value = selectedDate;
   migrateExistingDays();
   bindEvents();
   renderAll();
   initializeFirebase();
   registerServiceWorker();
+}
+
+function dismissLaunchSplash() {
+  if (!els.launchSplash) return;
+  window.setTimeout(() => {
+    els.launchSplash.classList.add("hide");
+    window.setTimeout(() => els.launchSplash.remove(), 420);
+  }, 1250);
 }
 
 function bindEvents() {
@@ -398,6 +408,11 @@ function renderDailyForm() {
   setFormValue("happyEnd", daily.happyEnd ?? "");
   setFormValue("oneMove", daily.oneMove ?? "");
   setFormValue("sleepHours", daily.sleepHours ?? "");
+  setFormValue("interruptedWakeTime", daily.interruptedWakeTime ?? "");
+  setFormValue("interruptedWakeMinutes", daily.interruptedWakeMinutes ?? "");
+  setFormValue("finalWakeTime", daily.finalWakeTime ?? "");
+  setFormValue("napStartTime", daily.napStartTime ?? "");
+  setFormValue("napMinutes", daily.napMinutes ?? "");
   setFormValue("mainWorkHours", daily.mainWorkHours ?? "");
   setFormValue("sideWorkHours", daily.sideWorkHours ?? "");
   setFormValue("mainWorkNote", daily.mainWorkNote ?? "");
@@ -406,6 +421,8 @@ function renderDailyForm() {
   setFormValue("checkoutCheckedAt", daily.checkoutCheckedAt ?? "");
   setFormValue("directionScore", daily.directionScore ?? 5);
   setFormValue("checkoutNote", daily.checkoutNote ?? "");
+  els.dailyForm.elements.alcohol.checked = Boolean(daily.alcohol);
+  els.dailyForm.elements.sauna.checked = Boolean(daily.sauna);
   renderExerciseRows(normalizeExercises(daily));
   renderSupplementRows(normalizeSupplements(daily));
   renderDailyMeta();
@@ -428,6 +445,11 @@ function saveDailyFromForm() {
     happyEnd: data.happyEnd.trim(),
     oneMove: data.oneMove.trim(),
     sleepHours: numberOrNull(data.sleepHours),
+    interruptedWakeTime: data.interruptedWakeTime,
+    interruptedWakeMinutes: numberOrNull(data.interruptedWakeMinutes),
+    finalWakeTime: data.finalWakeTime,
+    napStartTime: data.napStartTime,
+    napMinutes: numberOrNull(data.napMinutes),
     mainWorkHours: numberOrNull(data.mainWorkHours),
     sideWorkHours: numberOrNull(data.sideWorkHours),
     mainWorkNote: data.mainWorkNote.trim(),
@@ -435,6 +457,8 @@ function saveDailyFromForm() {
     exercises: readExerciseRows(),
     supplements: readSupplementRows(),
     gratitude: data.gratitude.trim(),
+    alcohol: Boolean(data.alcohol),
+    sauna: Boolean(data.sauna),
     checkoutCheckedAt: data.checkoutCheckedAt,
     directionScore: numberOrNull(data.directionScore),
     checkoutNote: data.checkoutNote.trim(),
@@ -772,6 +796,10 @@ function renderReport() {
   const sleepiness = rows.map((row) => row.daily.sleepiness).filter(isNumber);
   const motivations = rows.map((row) => row.daily.motivation).filter(isNumber);
   const sleeps = rows.map((row) => row.daily.sleepHours).filter(isNumber);
+  const interruptedWakeMinutes = rows.map((row) => row.daily.interruptedWakeMinutes).filter(isNumber);
+  const napMinutes = rows.map((row) => row.daily.napMinutes).filter(isNumber);
+  const alcoholDays = rows.filter((row) => row.daily.alcohol).length;
+  const saunaDays = rows.filter((row) => row.daily.sauna).length;
   const mainWork = sum(rows.map((row) => row.daily.mainWorkHours));
   const sideWork = sum(rows.map((row) => row.daily.sideWorkHours));
   const exerciseMinutes = sum(rows.map((row) => totalExerciseMinutes(row.daily)));
@@ -782,6 +810,10 @@ function renderReport() {
     ["平均眠気", averageText(sleepiness)],
     ["平均やる気", averageText(motivations)],
     ["平均睡眠", sleeps.length ? `${average(sleeps).toFixed(1)}h` : "-"],
+    ["中途覚醒", interruptedWakeMinutes.length ? `${Math.round(average(interruptedWakeMinutes))}分` : "-"],
+    ["昼寝合計", `${Math.round(sum(napMinutes))}分`],
+    ["飲酒日数", `${alcoholDays}日`],
+    ["サウナ日数", `${saunaDays}日`],
     ["本業合計", `${mainWork.toFixed(1)}h`],
     ["副業合計", `${sideWork.toFixed(1)}h`],
     ["運動合計", `${Math.round(exerciseMinutes)}分`],
@@ -908,6 +940,10 @@ function handleChartTap(event) {
 function renderInsights(rows) {
   const filledDays = rows.filter((row) => Object.keys(row.daily).length);
   const sleepRows = rows.filter((row) => isNumber(row.daily.sleepHours) && isNumber(row.daily.morningMood));
+  const interruptedRows = rows.filter((row) => isNumber(row.daily.interruptedWakeMinutes) && isNumber(row.daily.morningMood));
+  const alcoholRows = rows.filter((row) => row.daily.alcohol && isNumber(row.daily.morningMood));
+  const noAlcoholRows = rows.filter((row) => !row.daily.alcohol && isNumber(row.daily.morningMood));
+  const saunaRows = rows.filter((row) => row.daily.sauna && isNumber(row.daily.morningMood));
   const exerciseRows = rows.filter((row) => totalExerciseMinutes(row.daily) > 0 && isNumber(row.daily.morningMood));
   const checkoutScores = rows.map((row) => row.daily.directionScore).filter(isNumber);
   const insights = [`${reportRange === "week" ? "この週" : "この月"}は ${filledDays.length} 日分の記録があります。`];
@@ -921,6 +957,19 @@ function renderInsights(rows) {
   }
   if (exerciseRows.length >= 2) {
     insights.push(`運動した日の平均気分は ${average(exerciseRows.map((row) => row.daily.morningMood)).toFixed(1)} です。`);
+  }
+  if (interruptedRows.length >= 2) {
+    const shortAwake = interruptedRows.filter((row) => row.daily.interruptedWakeMinutes <= 15).map((row) => row.daily.morningMood);
+    const longAwake = interruptedRows.filter((row) => row.daily.interruptedWakeMinutes > 15).map((row) => row.daily.morningMood);
+    if (shortAwake.length && longAwake.length) {
+      insights.push(`中途覚醒が15分以内の日の平均気分は ${average(shortAwake).toFixed(1)}、長い日は ${average(longAwake).toFixed(1)} です。`);
+    }
+  }
+  if (alcoholRows.length && noAlcoholRows.length) {
+    insights.push(`飲酒ありの日の平均気分は ${average(alcoholRows.map((row) => row.daily.morningMood)).toFixed(1)}、なしの日は ${average(noAlcoholRows.map((row) => row.daily.morningMood)).toFixed(1)} です。`);
+  }
+  if (saunaRows.length >= 2) {
+    insights.push(`サウナありの日の平均気分は ${average(saunaRows.map((row) => row.daily.morningMood)).toFixed(1)} です。`);
   }
   if (checkoutScores.length) {
     insights.push(`夜の方向スコア平均は ${average(checkoutScores).toFixed(1)} です。10に近いほどハッピーエンド寄りです。`);

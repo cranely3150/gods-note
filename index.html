@@ -9,6 +9,13 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
+    <div class="launch-splash" id="launchSplash" aria-hidden="true">
+      <div class="launch-burst">
+        <span>GOD</span>
+        <strong>確定</strong>
+        <small>GOD'S NOTE</small>
+      </div>
+    </div>
     <div class="app-shell">
       <header class="topbar">
         <div>
@@ -118,11 +125,36 @@
                 <label class="field">睡眠時間
                   <input name="sleepHours" type="number" min="0" max="24" step="0.25" inputmode="decimal" placeholder="6.5">
                 </label>
+                <label class="field">中途覚醒時刻
+                  <input name="interruptedWakeTime" type="time">
+                </label>
+                <label class="field">中途覚醒時間 分
+                  <input name="interruptedWakeMinutes" type="number" min="0" max="600" step="5" inputmode="numeric" placeholder="30">
+                </label>
+                <label class="field">最終起床時刻
+                  <input name="finalWakeTime" type="time">
+                </label>
+                <label class="field">昼寝開始
+                  <input name="napStartTime" type="time">
+                </label>
+                <label class="field">昼寝時間 分
+                  <input name="napMinutes" type="number" min="0" max="360" step="5" inputmode="numeric" placeholder="20">
+                </label>
                 <label class="field">本業時間
                   <input name="mainWorkHours" type="number" min="0" max="24" step="0.25" inputmode="decimal" placeholder="8">
                 </label>
                 <label class="field">副業時間
                   <input name="sideWorkHours" type="number" min="0" max="24" step="0.25" inputmode="decimal" placeholder="1.5">
+                </label>
+              </div>
+              <div class="check-grid">
+                <label class="checkline compact-check">
+                  <input name="alcohol" type="checkbox">
+                  <span>飲酒あり</span>
+                </label>
+                <label class="checkline compact-check">
+                  <input name="sauna" type="checkbox">
+                  <span>サウナあり</span>
                 </label>
               </div>
               <label class="field">本業の仕事内容
