@@ -39,6 +39,7 @@
         </section>
 
         <section class="calendar surface" aria-label="月間カレンダー">
+          <div class="daily-quote" id="dailyQuote" aria-live="polite"></div>
           <div class="section-head compact">
             <button class="icon-button" id="prevMonth" type="button" aria-label="前の月" title="前の月">
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
@@ -201,6 +202,7 @@
                 <h2>ジャーナル</h2>
               </div>
               <button class="primary-button" id="addJournalButton" type="button">追加</button>
+              <button class="secondary-button" id="cancelJournalEditButton" type="button" hidden>編集をやめる</button>
             </div>
             <label class="field">タイトル
               <input id="journalTitle" type="text" placeholder="任意">
@@ -217,6 +219,28 @@
               </label>
             </div>
           </section>
+          <section class="surface">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">ARCHIVE</p>
+                <h2>雑記一覧</h2>
+              </div>
+            </div>
+            <div class="input-grid">
+              <label class="field">検索
+                <input id="journalSearch" type="search" placeholder="本文・タイトルから探す">
+              </label>
+              <label class="field">カテゴリ
+                <input id="journalCategoryFilter" type="text" placeholder="カテゴリで絞り込み">
+              </label>
+              <label class="field">日付順
+                <select id="journalSort">
+                  <option value="desc">新しい順</option>
+                  <option value="asc">古い順</option>
+                </select>
+              </label>
+            </div>
+          </section>
           <section class="journal-list" id="journalList" aria-live="polite"></section>
         </section>
 
@@ -225,7 +249,7 @@
             <div class="section-head">
               <div>
                 <p class="eyebrow">REVIEW</p>
-                <h2>直近の振り返り</h2>
+                <h2>サマリー</h2>
               </div>
               <div class="segmented">
                 <button class="active" type="button" data-range="week">週</button>

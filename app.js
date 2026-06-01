@@ -3,6 +3,19 @@ const FIREBASE_CONFIG_KEY = "gods-note-firebase-config-v1";
 const FIREBASE_LOGIN_STARTED_KEY = "gods-note-firebase-login-started-v1";
 const FIREBASE_SDK_VERSION = "10.12.5";
 
+const MOTIVATION_QUOTES = [
+  { text: "継続は力なり。小さく続ける者が遠くへ行く。", author: "日本のことわざ" },
+  { text: "成功に一番確かな方法は、もう一度だけ試すこと。", author: "トーマス・エジソン" },
+  { text: "昨日より今日、今日より明日。成長は一歩ずつでいい。", author: "GOD'S NOTE" },
+  { text: "困難の中に、次の機会が隠れている。", author: "アルベルト・アインシュタイン" },
+  { text: "始めるから整う。整ってから始めるのではない。", author: "GOD'S NOTE" },
+  { text: "倒れたことではなく、起き上がることが人をつくる。", author: "ネルソン・マンデラ" },
+  { text: "一日を変える一手が、人生の向きを変える。", author: "GOD'S NOTE" },
+  { text: "急がず、休まず。", author: "ゲーテ" },
+  { text: "できると思えばできる。できないと思えば、そこで止まる。", author: "ヘンリー・フォード" },
+  { text: "今日の記録は、未来の自分への地図になる。", author: "GOD'S NOTE" },
+];
+
 const DEFAULT_ACTIVITIES = [
   { id: "stretch", label: "ストレッチ" },
   { id: "spinBike", label: "スピンバイク" },
@@ -41,6 +54,7 @@ const state = loadState();
 let selectedDate = todayKey();
 let calendarMonth = selectedDate.slice(0, 7);
 let reportRange = "week";
+let editingJournal = null;
 
 const els = {
   selectedDateText: document.querySelector("#selectedDateText"),
@@ -53,6 +67,7 @@ const els = {
   nextMonth: document.querySelector("#nextMonth"),
   calendarMonth: document.querySelector("#calendarMonth"),
   calendarGrid: document.querySelector("#calendarGrid"),
+  dailyQuote: document.querySelector("#dailyQuote"),
   dailyForm: document.querySelector("#dailyForm"),
   settingsForm: document.querySelector("#settingsForm"),
   checkinNowButton: document.querySelector("#checkinNowButton"),
@@ -74,10 +89,14 @@ const els = {
   supplementCandidateTemplate: document.querySelector("#supplementCandidateTemplate"),
   addSupplementCandidateButton: document.querySelector("#addSupplementCandidateButton"),
   addJournalButton: document.querySelector("#addJournalButton"),
+  cancelJournalEditButton: document.querySelector("#cancelJournalEditButton"),
   journalTitle: document.querySelector("#journalTitle"),
   journalBody: document.querySelector("#journalBody"),
   journalMood: document.querySelector("#journalMood"),
   journalCategory: document.querySelector("#journalCategory"),
+  journalSearch: document.querySelector("#journalSearch"),
+  journalCategoryFilter: document.querySelector("#journalCategoryFilter"),
+  journalSort: document.querySelector("#journalSort"),
   journalList: document.querySelector("#journalList"),
   statsGrid: document.querySelector("#statsGrid"),
   chartLegend: document.querySelector("#chartLegend"),
@@ -172,12 +191,12 @@ function bindEvents() {
   });
 
   els.addActivityButton.addEventListener("click", () => {
-    addActivityRow({ id: "", label: "" });
+    addActivityRow({ id: "", label: "" }, { prepend: true });
     saveActivitiesFromRows();
   });
 
   els.addSupplementCandidateButton.addEventListener("click", () => {
-    addSupplementCandidateRow("");
+    addSupplementCandidateRow("", { prepend: true });
     saveSupplementCandidatesFromRows();
   });
 
@@ -263,6 +282,12 @@ function bindEvents() {
   });
 
   els.addJournalButton.addEventListener("click", addJournal);
+  els.cancelJournalEditButton.addEventListener("click", resetJournalEditor);
+  els.journalList.addEventListener("click", handleJournalAction);
+  [els.journalSearch, els.journalCategoryFilter, els.journalSort].forEach((field) => {
+    field.addEventListener("input", renderJournalList);
+    field.addEventListener("change", renderJournalList);
+  });
   els.exportButton.addEventListener("click", exportData);
   els.importButton.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", importData);
@@ -320,6 +345,7 @@ function renderCalendar() {
   const start = new Date(first);
   start.setDate(first.getDate() - first.getDay());
   els.calendarMonth.textContent = `${year}年${month}月`;
+  renderDailyQuote();
 
   els.calendarGrid.innerHTML = Array.from({ length: 42 }, (_, index) => {
     const date = new Date(start);
@@ -342,6 +368,20 @@ function renderCalendar() {
       renderAll();
     });
   });
+}
+
+function renderDailyQuote() {
+  const quote = quoteForDate(todayKey());
+  els.dailyQuote.innerHTML = `
+    <p>${escapeHtml(quote.text)}</p>
+    <span>${escapeHtml(quote.author)}</span>
+  `;
+}
+
+function quoteForDate(dateKey) {
+  const date = parseDateKey(dateKey);
+  const seed = Math.floor(date.getTime() / 86400000);
+  return MOTIVATION_QUOTES[Math.abs(seed) % MOTIVATION_QUOTES.length];
 }
 
 function renderDailyForm() {
@@ -514,11 +554,12 @@ function renderActivityRows() {
   getActivities().forEach((activity) => addActivityRow(activity));
 }
 
-function addActivityRow(activity) {
+function addActivityRow(activity, options = {}) {
   const node = els.activityTemplate.content.firstElementChild.cloneNode(true);
   node.querySelector('[data-activity-field="label"]').value = activity.label || "";
   node.querySelector('[data-activity-field="id"]').value = activity.id || "";
-  els.activityList.append(node);
+  if (options.prepend) els.activityList.prepend(node);
+  else els.activityList.append(node);
 }
 
 function saveActivitiesFromRows() {
@@ -538,10 +579,11 @@ function renderSupplementCandidateRows() {
   getSupplementCandidates().forEach((name) => addSupplementCandidateRow(name));
 }
 
-function addSupplementCandidateRow(name) {
+function addSupplementCandidateRow(name, options = {}) {
   const node = els.supplementCandidateTemplate.content.firstElementChild.cloneNode(true);
   node.querySelector('[data-supplement-candidate-field="name"]').value = name || "";
-  els.supplementCandidateList.append(node);
+  if (options.prepend) els.supplementCandidateList.prepend(node);
+  else els.supplementCandidateList.append(node);
 }
 
 function saveSupplementCandidatesFromRows() {
@@ -576,57 +618,147 @@ function getCheckoutTouchedAt() {
 function addJournal() {
   const body = els.journalBody.value.trim();
   if (!body) {
-    showToast("本文を書いてから追加します");
+    showToast("本文を書いてから保存します");
     return;
   }
 
   const entry = {
-    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
-    createdAt: new Date().toISOString(),
+    id: editingJournal?.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+    createdAt: editingJournal?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     title: els.journalTitle.value.trim(),
     body,
     mood: numberOrNull(els.journalMood.value),
     category: els.journalCategory.value.trim(),
   };
 
-  const daily = getDaily(selectedDate);
-  daily.journals = [entry, ...(daily.journals || [])];
-  state.days[selectedDate] = daily;
+  const targetDate = editingJournal?.date || selectedDate;
+  const daily = getDaily(targetDate);
+  const journals = daily.journals || [];
+  daily.journals = editingJournal
+    ? journals.map((item) => item.id === entry.id ? entry : item)
+    : [entry, ...journals];
+  daily.updatedAt = new Date().toISOString();
+  state.days[targetDate] = daily;
   saveState();
 
-  els.journalTitle.value = "";
-  els.journalBody.value = "";
-  els.journalMood.value = "";
-  els.journalCategory.value = "";
+  const wasEditing = Boolean(editingJournal);
+  resetJournalEditor();
   renderJournalList();
   renderReport();
   renderCalendar();
-  showToast("雑記を追加しました");
+  showToast(wasEditing ? "雑記を更新しました" : "雑記を追加しました");
 }
 
 function renderJournalList() {
-  const journals = getDaily(selectedDate).journals || [];
+  const journals = filteredJournals();
   if (!journals.length) {
-    els.journalList.innerHTML = `<article class="journal-item"><p class="note">この日の雑記はまだありません。</p></article>`;
+    els.journalList.innerHTML = `<article class="journal-item empty"><p class="note">条件に合う雑記はまだありません。</p></article>`;
     return;
   }
 
-  els.journalList.innerHTML = journals.map((entry) => {
+  els.journalList.innerHTML = journals.map(({ date, entry }) => {
     const title = escapeHtml(entry.title || "無題");
-    const time = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit" }).format(new Date(entry.createdAt));
+    const created = new Date(entry.createdAt);
+    const time = new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(created);
     const mood = entry.mood ? `気分 ${entry.mood}` : "";
     const category = entry.category ? escapeHtml(entry.category) : "";
-    const meta = [mood, category].filter(Boolean).join(" / ");
+    const meta = [date, mood, category].filter(Boolean).join(" / ");
     return `
-      <article class="journal-item">
+      <article class="journal-item" data-journal-date="${escapeHtml(date)}" data-journal-id="${escapeHtml(entry.id)}">
         <header>
           <h3>${title}</h3>
           <time>${time}</time>
         </header>
         <p>${escapeHtml(entry.body)}</p>
         ${meta ? `<div class="meta">${meta}</div>` : ""}
+        <div class="journal-actions">
+          <button class="secondary-button" type="button" data-journal-action="edit">編集</button>
+          <button class="secondary-button danger-button" type="button" data-journal-action="delete">削除</button>
+        </div>
       </article>`;
   }).join("");
+}
+
+function filteredJournals() {
+  const query = normalizeSearchText(els.journalSearch.value);
+  const categoryFilter = normalizeSearchText(els.journalCategoryFilter.value);
+  const sortDirection = els.journalSort.value;
+  const journals = allJournals().filter(({ entry }) => {
+    const searchable = normalizeSearchText(`${entry.title || ""} ${entry.body || ""} ${entry.category || ""}`);
+    const category = normalizeSearchText(entry.category || "");
+    return (!query || searchable.includes(query)) && (!categoryFilter || category.includes(categoryFilter));
+  });
+  journals.sort((a, b) => {
+    const left = a.entry.createdAt || a.date;
+    const right = b.entry.createdAt || b.date;
+    return sortDirection === "asc" ? left.localeCompare(right) : right.localeCompare(left);
+  });
+  return journals;
+}
+
+function allJournals() {
+  return Object.entries(state.days || {}).flatMap(([date, daily]) => {
+    return (daily.journals || []).map((entry) => ({ date, entry }));
+  });
+}
+
+function handleJournalAction(event) {
+  const button = event.target.closest("[data-journal-action]");
+  if (!button) return;
+  const item = button.closest(".journal-item");
+  const date = item.dataset.journalDate;
+  const id = item.dataset.journalId;
+  if (button.dataset.journalAction === "edit") {
+    startJournalEdit(date, id);
+  } else if (button.dataset.journalAction === "delete") {
+    deleteJournal(date, id);
+  }
+}
+
+function startJournalEdit(date, id) {
+  const entry = findJournal(date, id);
+  if (!entry) return;
+  editingJournal = { date, id, createdAt: entry.createdAt };
+  selectedDate = date;
+  calendarMonth = selectedDate.slice(0, 7);
+  els.datePicker.value = selectedDate;
+  els.journalTitle.value = entry.title || "";
+  els.journalBody.value = entry.body || "";
+  els.journalMood.value = entry.mood ?? "";
+  els.journalCategory.value = entry.category || "";
+  els.addJournalButton.textContent = "更新";
+  els.cancelJournalEditButton.hidden = false;
+  renderDateHeader();
+  renderCalendar();
+  showToast("雑記を編集できます");
+}
+
+function deleteJournal(date, id) {
+  const daily = getDaily(date);
+  daily.journals = (daily.journals || []).filter((entry) => entry.id !== id);
+  daily.updatedAt = new Date().toISOString();
+  state.days[date] = daily;
+  if (editingJournal?.date === date && editingJournal?.id === id) resetJournalEditor();
+  saveState();
+  renderJournalList();
+  renderReport();
+  renderCalendar();
+  showToast("雑記を削除しました");
+}
+
+function findJournal(date, id) {
+  return (getDaily(date).journals || []).find((entry) => entry.id === id);
+}
+
+function resetJournalEditor() {
+  editingJournal = null;
+  els.journalTitle.value = "";
+  els.journalBody.value = "";
+  els.journalMood.value = "";
+  els.journalCategory.value = "";
+  els.addJournalButton.textContent = "追加";
+  els.cancelJournalEditButton.hidden = true;
 }
 
 function renderReport() {
@@ -1282,6 +1414,10 @@ function average(values) {
 
 function averageText(values) {
   return values.length ? average(values).toFixed(1) : "-";
+}
+
+function normalizeSearchText(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function escapeHtml(value) {

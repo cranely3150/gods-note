@@ -19,11 +19,14 @@
 html {
   min-height: 100%;
   background: var(--bg);
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   min-height: 100%;
+  width: 100%;
+  overflow-x: hidden;
   color: var(--ink);
   font-family: "Aptos", "Yu Gothic UI", "Hiragino Kaku Gothic ProN", "Segoe UI", system-ui, sans-serif;
   line-height: 1.5;
@@ -41,9 +44,10 @@ button {
 }
 
 .app-shell {
-  width: min(100%, 760px);
+  width: 100%;
+  max-width: 760px;
   margin: 0 auto;
-  padding: max(16px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+  padding: max(16px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
 }
 
 .topbar,
@@ -148,6 +152,8 @@ h2 {
 
 .date-strip {
   position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   gap: 8px;
   margin-bottom: 14px;
 }
@@ -184,10 +190,12 @@ h2 {
   position: sticky;
   top: 0;
   z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
-  margin: 0 -4px 14px;
-  padding: 6px 4px;
-  overflow-x: auto;
+  margin: 0 0 14px;
+  padding: 6px 0;
+  overflow: visible;
   background: rgba(246, 242, 232, 0.92);
   backdrop-filter: blur(10px);
 }
@@ -202,8 +210,8 @@ h2 {
 }
 
 .tab {
-  flex: 1 0 76px;
-  padding: 0 12px;
+  min-width: 0;
+  padding: 0 6px;
 }
 
 .tab.active,
@@ -250,17 +258,48 @@ h2 {
 }
 
 .section-head.compact {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
   margin-bottom: 10px;
 }
 
 .section-head.compact h2 {
-  flex: 1;
+  min-width: 0;
   text-align: center;
 }
 
 .calendar {
   margin-bottom: 14px;
   padding: 12px;
+}
+
+.daily-quote {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-left: 4px solid var(--accent-2);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.daily-quote p {
+  margin: 0 0 4px;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", "Yu Gothic UI", serif;
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.daily-quote span {
+  display: block;
+  max-width: 100%;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .calendar-weekdays,
@@ -395,7 +434,7 @@ input[type="range"] {
 
 .time-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(132px, auto);
   gap: 8px;
   align-items: center;
 }
@@ -431,6 +470,11 @@ input[type="range"] {
   background: #fffdf8;
   color: var(--ink);
   font-weight: 800;
+}
+
+.danger-button {
+  border-color: rgba(159, 18, 57, 0.28);
+  color: var(--danger);
 }
 
 .journal-list {
@@ -621,6 +665,13 @@ input[type="range"] {
   white-space: pre-wrap;
 }
 
+.journal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .meta {
   color: var(--muted);
   font-size: 0.78rem;
@@ -722,5 +773,43 @@ canvas {
 
   .surface {
     padding: 20px;
+  }
+}
+
+@media (max-width: 520px) {
+  .app-shell {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .section-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .section-head.compact {
+    flex-wrap: nowrap;
+  }
+
+  .section-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .pill {
+    max-width: 100%;
+  }
+
+  .time-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .time-row .secondary-button {
+    width: 100%;
+  }
+
+  .journal-item header {
+    display: grid;
   }
 }
